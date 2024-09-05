@@ -3,6 +3,10 @@ recebe_num: .asciz "Dê o valor de um número:\n"
 entrada:    .asciz "%f"
 saida_el:   .asciz "%f\n"
 pivo_msg:   .asciz "Dê o valor para o pivô:\n"
+menor_msg:  .asciz "Vetor de menores: "
+maior_msg:  .asciz "Vetor de maiores: "
+elemento:   .asciz "%f "
+newline:    .asciz "\n"
 
     .text
     .globl main
@@ -24,19 +28,29 @@ main:
     addl $12, %esp
     leal -72(%ebp), %eax
     flds (%eax)                 # pivo ficará no %st(1)
-    movl $0, -80(%ebp)          # -80(%ebp) == qtd de elementos em vetor_menores
-                                # -144(%ebp) até -88(%ebp) == double vetor_menores[8]
-    movl $0, -148(%ebp)         # -148(%ebp) == qtd de elementos em vetor_maiores
-                                # -212(%ebp) até -156(%ebp) == double vetor_maiores[8] 
-    leal -80(%ebp), %edi        # Como se fosse uma struct { int qtd; double vetor[8] };
-    leal -148(%ebp), %esi
+    leal -136(%ebp), %edi       # double menores[8]
+    leal -200(%ebp), %esi       # double maiores[8]
     leal -64(%ebp), %edx
     call divide
-    
-    leal -144(%ebp), %edi
+
+    pushl $menor_msg
+    call printf
+    addl $4, %esp
+    leal -136(%ebp), %edi
     call print_vetor
-    leal -212(%ebp), %edi
+    pushl $maior_msg
+    call printf
+    addl $4, %esp
+    leal -200(%ebp), %edi
     call print_vetor
+
+    leal -64(%ebp), %edi
+    call print_vetor
+
+    fstpl (%esp)
+    pushl $saida_el
+    call printf
+    addl $4, %esp
 
     pushl $0
     call exit
@@ -84,12 +98,14 @@ prv_loop:
     addl -4(%ebp), %eax
     flds (%eax)
     fstpl (%esp)
-    pushl $saida_el
+    pushl $elemento
     call printf
     addl $4, %esp
     incl -8(%ebp)
     jmp prv_loop
 prv_fim:
+    pushl $newline
+    call printf
     movl %ebp, %esp
     popl %ebp
     ret
@@ -98,10 +114,12 @@ divide:
     pushl %ebp
     movl %esp, %ebp
     subl $32, %esp
-    movl %edi, -4(%ebp)         # -4(%ebp) == struct { int qtd; double vetor[8] } *menores;
-    movl %esi, -8(%ebp)         # -8(%ebp) == struct { int qtd; double vetor[8] } *maiores;
+    movl %edi, -4(%ebp)         # -4(%ebp) == double* menores
+    movl %esi, -8(%ebp)         # -8(%ebp) == double* maiores
     movl %edx, -12(%ebp)        # -12(%ebp) == *vetor
     movl $0, -16(%ebp)          # -16(%ebp) == int i = 0;
+    movl $0, -20(%ebp)          # -20(%ebp) == qtd de elementos em menores
+    movl $0, -24(%ebp)          # -24(%ebp) == qtd de elementos em maiores
 div_loop:
     movl $8, %eax
     cmpl %eax, -16(%ebp)
@@ -110,35 +128,25 @@ div_loop:
     movl $8, %ebx
     mull %ebx
     addl -12(%ebp), %eax
-    flds (%eax)
-    fcomi %st(1), %st(0)
+    fldl (%eax)
+    fcomi %st(1)
     ja div_maior                # elemento atual de *vetor maior que pivo
-    movl -4(%ebp), %eax         # menores
-    movl (%eax), %eax
+    movl -20(%ebp), %eax
     movl $8, %ebx
     mull %ebx
-    addl -4(%ebp), %eax
-    addl $4, %eax               # vetor[8] começa 4 bytes depois do ponteiro
+    addl -4(%ebp), %eax         # menores + qtd_menores * tamanho double
     fstpl (%eax)
-    movl -4(%ebp), %eax
-    movl (%eax), %ebx
-    incl %ebx
-    movl %ebx, (%eax)
+    incl -20(%ebp)
 div_ret:    
     incl -16(%ebp)
     jmp div_loop
 div_maior:
-    movl -8(%ebp), %eax
-    movl (%eax), %eax
+    movl -24(%ebp), %eax
     movl $8, %ebx
     mull %ebx
-    addl -8(%ebp), %eax
-    addl $4, %eax
+    addl -8(%ebp), %eax         # maiores + qtd_maiores + tamanho double
     fstpl (%eax)
-    movl -8(%ebp), %eax
-    movl (%eax), %ebx
-    incl %ebx
-    movl %ebx, (%eax)
+    incl -24(%ebp)
     jmp div_ret
 div_fim:    
     movl %ebp, %esp
